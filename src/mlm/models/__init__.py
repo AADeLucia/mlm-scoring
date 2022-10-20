@@ -91,7 +91,13 @@ def get_pretrained(ctxs: List[mx.Context], name: str = 'bert-base-en-uncased', p
         model_fullname = name
         model_name = model_fullname.split('/')[-1]
 
-        if model_name.startswith('albert-'):
+        # Alexandra: add XLM-R loading for TwHIN-BERT, Bernice, XLM-T, XLM-R
+        if model_name.startswith("bernice") or model_name.startswith("twitter-") or model_name.startswith("twhin") or model_name.startswith("xlm-r"):
+            model, loading_info = transformers.XLMRobertaForMaskedLM.from_pretrained(model_fullname, output_loading_info=True)
+            tokenizer = transformers.XLMRobertaTokenizer.from_pretrained(model_fullname)
+            vocab = None
+
+        elif model_name.startswith('albert-'):
 
             if params_file is None:
                 model, loading_info = AlbertForMaskedLMOptimized.from_pretrained(model_fullname, output_loading_info=True)
@@ -121,10 +127,9 @@ def get_pretrained(ctxs: List[mx.Context], name: str = 'bert-base-en-uncased', p
             tokenizer = transformers.DistilBertTokenizer.from_pretrained(model_fullname)
             vocab = None
 
-        elif model_name.startswith('xlm-'):
-
+        elif model_name.startswith("xlm-"):
             model, loading_info = transformers.XLMWithLMHeadModel.from_pretrained(model_fullname, output_loading_info=True)
-            tokenizer = transformers.XLMTokenizer.from_pretrained(model_fullname)
+            tokenizer = transformers.XLMWithLMHeadModel.from_pretrained(model_fullname)
             vocab = None
 
             # TODO: Not needed in transformers v3? Will vet.

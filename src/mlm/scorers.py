@@ -34,19 +34,19 @@ class BaseScorer(ABC):
         self._eos = eos
         self._capitalize = capitalize
         self._max_length = 1024
-        if not self._check_support(model):
-            raise ValueError(f"""
-Model '{model.__class__.__name__}' is not supported by the scorer '{self.__class__.__name__}'.
-- MLMScorer supports MXNet GluonNLP MLMs: {SUPPORTED_MLMS}
-- LMScorer supports MXNet GluonNLP LMs: {SUPPORTED_LMS}
-- MLMScorerPT supports PyTorch Transformers MLMs:
-    - 'albert-*' (wrapped by AlbertForMaskedLMOptimized)
-    - 'bert-*' (wrapped by BertForMaskedLMOptimized)
-    - 'distilbert-*' (wrapped by DistilBertForMaskedLMOptimized)
-    - 'xlm-*' (some variants require 'lang' parameter; XLM-R not supported)
-""")
-        else:
-            logging.warn(f"Created scorer of class '{self.__class__.__name__}'.")
+#         if not self._check_support(model):
+#             raise ValueError(f"""
+# Model '{model.__class__.__name__}' is not supported by the scorer '{self.__class__.__name__}'.
+# - MLMScorer supports MXNet GluonNLP MLMs: {SUPPORTED_MLMS}
+# - LMScorer supports MXNet GluonNLP LMs: {SUPPORTED_LMS}
+# - MLMScorerPT supports PyTorch Transformers MLMs:
+#     - 'albert-*' (wrapped by AlbertForMaskedLMOptimized)
+#     - 'bert-*' (wrapped by BertForMaskedLMOptimized)
+#     - 'distilbert-*' (wrapped by DistilBertForMaskedLMOptimized)
+#     - 'xlm-*' (some variants require 'lang' parameter; XLM-R not supported)
+# """)
+#         else:
+#             logging.warn(f"Created scorer of class '{self.__class__.__name__}'.")
 
 
     def _apply_tokenizer_opts(self, sent: str) -> str:
@@ -73,7 +73,7 @@ Model '{model.__class__.__name__}' is not supported by the scorer '{self.__class
         # Hence, we use num_shards = 0 and do gluon's split_data
         batch_sampler = nlp.data.sampler.FixedBucketSampler([sent_tuple[2] for sent_tuple in dataset], batch_size=split_size, ratio=ratio, num_shards=0, shuffle=shuffle)
 
-        logging.info(batch_sampler.stats())
+        #logging.info(batch_sampler.stats())
         dataloader = nlp.data.ShardedDataLoader(dataset, pin_memory=True, batch_sampler=batch_sampler, batchify_fn=self._batchify_fn, num_workers=num_workers, thread_pool=True)
 
         return dataset, batch_sampler, dataloader
@@ -434,7 +434,7 @@ masked_id = {}
         # Hence, we use num_shards = 0 and do gluon's split_data
         batch_sampler = nlp.data.sampler.FixedBucketSampler([sent_tuple[2] for sent_tuple in dataset], batch_size=split_size, ratio=ratio, num_shards=0, shuffle=False)
 
-        logging.info(batch_sampler.stats())
+        #logging.info(batch_sampler.stats())
         dataloader = nlp.data.ShardedDataLoader(dataset, pin_memory=True, batch_sampler=batch_sampler, batchify_fn=batchify_fn, num_workers=num_workers, thread_pool=True)
 
         # Get lengths in tokens (assumes dataset is in order)
@@ -648,7 +648,7 @@ class MLMScorerPT(BaseScorer):
         # Hence, we use num_shards = 0 and do gluon's split_data
         batch_sampler = nlp.data.sampler.FixedBucketSampler([sent_tuple[2] for sent_tuple in dataset], batch_size=split_size, ratio=ratio, num_shards=0, shuffle=False)
 
-        logging.info(batch_sampler.stats())
+        # logging.info(batch_sampler.stats())
 
         # dataloader = nlp.data.ShardedDataLoader(dataset, pin_memory=True, batch_sampler=batch_sampler, batchify_fn=batchify_fn, num_workers=num_workers, thread_pool=True)
         dataloader = nlp.data.ShardedDataLoader(dataset, batch_sampler=batch_sampler, batchify_fn=batchify_fn)
@@ -743,6 +743,15 @@ class MLMScorerPT(BaseScorer):
                         # out[0] is what contains the distribution for the masked (batch_size, sequence_length, config.vocab_size)
                         # Reindex to only get the distributions at the masked positions (batch_size, config.vocab_size)
                         out = out[0][list(range(split_size)),masked_positions.reshape(-1),:]
+                    elif isinstance(self._model.module, transformers.XLMRobertaForMaskedLM):
+                        # Alexandra: Copying BERT code because IDK
+                        alen = torch.arange(token_ids.shape[1], dtype=torch.long)
+                        alen = alen.to(ctx)
+                        mask = alen < valid_length[:, None]
+                        out = self._model(input_ids=token_ids, attention_mask=mask)
+                        # out[0] is what contains the distribution for the masked (batch_size, sequence_length, config.vocab_size)
+                        # Reindex to only get the distributions at the masked positions (batch_size, config.vocab_size)
+                        out = out[0][list(range(split_size)), masked_positions.reshape(-1), :]
                     else:
                         raise ValueError
 
@@ -802,7 +811,7 @@ class MLMBinner(MLMScorer):
         # Hence, we use num_shards = 0 and do gluon's split_data
         batch_sampler = nlp.data.sampler.FixedBucketSampler([sent_tuple[2] for sent_tuple in dataset], batch_size=split_size, ratio=ratio, num_shards=0, shuffle=False)
 
-        logging.info(batch_sampler.stats())
+        #logging.info(batch_sampler.stats())
         dataloader = nlp.data.ShardedDataLoader(dataset, pin_memory=True, batch_sampler=batch_sampler, batchify_fn=batchify_fn, num_workers=num_workers, thread_pool=True)
 
         max_length = 256
