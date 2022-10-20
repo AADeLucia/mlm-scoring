@@ -93,8 +93,11 @@ def get_pretrained(ctxs: List[mx.Context], name: str = 'bert-base-en-uncased', p
 
         # Alexandra: add XLM-R loading for TwHIN-BERT, Bernice, XLM-T, XLM-R
         if model_name.startswith("bernice") or model_name.startswith("twitter-") or model_name.startswith("twhin") or model_name.startswith("xlm-r"):
-            model, loading_info = transformers.XLMRobertaForMaskedLM.from_pretrained(model_fullname, output_loading_info=True)
-            tokenizer = transformers.XLMRobertaTokenizer.from_pretrained(model_fullname)
+            model, loading_info = transformers.AutoModelForMaskedLM.from_pretrained(model_fullname, output_loading_info=True)
+            tokenizer = transformers.AutoTokenizer.from_pretrained(model_fullname)
+
+            #model, loading_info = transformers.XLMRobertaForMaskedLM.from_pretrained(model_fullname, output_loading_info=True)
+            #tokenizer = transformers.XLMRobertaTokenizer.from_pretrained(model_fullname)
             vocab = None
 
         elif model_name.startswith('albert-'):

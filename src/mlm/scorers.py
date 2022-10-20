@@ -33,7 +33,7 @@ class BaseScorer(ABC):
         self._ctxs = ctxs
         self._eos = eos
         self._capitalize = capitalize
-        self._max_length = 1024
+        self._max_length = self._tokenizer.model_max_length
 #         if not self._check_support(model):
 #             raise ValueError(f"""
 # Model '{model.__class__.__name__}' is not supported by the scorer '{self.__class__.__name__}'.
@@ -591,7 +591,7 @@ class MLMScorerPT(BaseScorer):
         # We don't mask the [CLS], [SEP] for now for PLL
         mask_indices = mask_indices[1:-1]
 
-        mask_token_id = self._tokenizer._convert_token_to_id(self._tokenizer.mask_token)
+        mask_token_id = self._tokenizer.convert_tokens_to_ids(self._tokenizer.mask_token)
         for mask_set in mask_indices:
             token_ids_masked = token_ids.copy()
             token_ids_masked[mask_set] = mask_token_id
@@ -610,7 +610,7 @@ class MLMScorerPT(BaseScorer):
 
         for sent_idx, sent in enumerate(corpus.values()):
             sent = self._apply_tokenizer_opts(sent)
-            ids_original = np.array(self._tokenizer.encode(sent, add_special_tokens=True))
+            ids_original = np.array(self._tokenizer.encode(sent, add_special_tokens=True, truncation=True))
 
             # Enforce max length
             if len(ids_original) > self._max_length:
@@ -638,7 +638,7 @@ class MLMScorerPT(BaseScorer):
         dataset = self.corpus_to_dataset(corpus)
 
         # Turn Dataset into Dataloader
-        batchify_fn = btf_generic.Tuple(btf_generic.Stack(dtype='int32'), btf_generic.Pad(pad_val=self._tokenizer._convert_token_to_id(self._tokenizer.pad_token), dtype='long'),
+        batchify_fn = btf_generic.Tuple(btf_generic.Stack(dtype='int32'), btf_generic.Pad(pad_val=self._tokenizer.convert_tokens_to_ids(self._tokenizer.pad_token), dtype='long'),
                               btf_generic.Stack(dtype='long'), btf_generic.Stack(dtype='long'),
                               btf_generic.Stack(dtype='long'), btf_generic.Stack(dtype='long'))
 
@@ -702,7 +702,7 @@ class MLMScorerPT(BaseScorer):
 
                 # TODO: Super inefficient where we go from MXNet to NumPy to PyTorch
 
-                with torch.no_grad():
+                with torch.inference_mode():
 
                     token_ids = torch.tensor(token_ids)
                     valid_length = torch.tensor(valid_length)
